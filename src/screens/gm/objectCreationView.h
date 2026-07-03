@@ -24,4 +24,5 @@ public:
     GuiObjectCreationView(GuiContainer* owner);
 
     virtual bool onMouseDown(sp::io::Pointer::Button button, glm::vec2 position, sp::io::Pointer::ID id) override;
+    virtual bool onMouseWheelScroll(glm::vec2 position, float value) override;
 };

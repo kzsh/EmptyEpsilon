@@ -173,3 +173,8 @@ bool GuiObjectCreationView::onMouseDown(sp::io::Pointer::Button button, glm::vec
 {   //Catch clicks.
     return true;
 }
+
+bool GuiObjectCreationView::onMouseWheelScroll(glm::vec2 position, float value)
+{   //Catch scroll.
+    return true;
+}

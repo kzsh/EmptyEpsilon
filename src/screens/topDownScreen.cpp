@@ -60,10 +60,11 @@ TopDownScreen::TopDownScreen(RenderLayer* render_layer)
     }
 }
 
-void TopDownScreen::onMouseWheelScroll(glm::vec2 position, float value)
+bool TopDownScreen::onMouseWheelScroll(glm::vec2 position, float value)
 {
     if (!executeScrollOnElement(position, value))
         pending_zoom += value;
+    return true;
 }
 
 void TopDownScreen::update(float delta)

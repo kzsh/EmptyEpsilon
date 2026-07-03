@@ -69,10 +69,10 @@ void GuiCanvas::onPointerUp(glm::vec2 position, sp::io::Pointer::ID id)
     }
 }
 
-void GuiCanvas::onMouseWheelScroll(glm::vec2 position, float value)
+bool GuiCanvas::onMouseWheelScroll(glm::vec2 position, float value)
 {
     mouse_position = position;
-    executeScrollOnElement(position, value);
+    return executeScrollOnElement(position, value) != nullptr;
 }
 
 void GuiCanvas::onTextInput(const string& text)

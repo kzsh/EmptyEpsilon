@@ -14,6 +14,7 @@ public:
 
     virtual void onDraw(sp::RenderTarget& renderer) override;
     virtual bool onMouseDown(sp::io::Pointer::Button button, glm::vec2 position, sp::io::Pointer::ID id) override;
+    virtual bool onMouseWheelScroll(glm::vec2 position, float value) override;
 };
 
 #endif//GUI2_PANEL_H

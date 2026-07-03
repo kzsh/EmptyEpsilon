@@ -31,3 +31,8 @@ bool GuiGlobalMessageEntryView::onMouseDown(sp::io::Pointer::Button button, glm:
 {   //Catch clicks.
     return true;
 }
+
+bool GuiGlobalMessageEntryView::onMouseWheelScroll(glm::vec2 position, float value)
+{   //Catch scroll.
+    return true;
+}

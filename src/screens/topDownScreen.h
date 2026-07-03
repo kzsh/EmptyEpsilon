@@ -22,5 +22,5 @@ public:
     TopDownScreen(RenderLayer* render_layer);
 
     virtual void update(float delta) override;
-    virtual void onMouseWheelScroll(glm::vec2 position, float value) override;
+    virtual bool onMouseWheelScroll(glm::vec2 position, float value) override;
 };

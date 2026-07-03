@@ -18,3 +18,8 @@ bool GuiPanel::onMouseDown(sp::io::Pointer::Button button, glm::vec2 position, s
 {
     return true;
 }
+
+bool GuiPanel::onMouseWheelScroll(glm::vec2 position, float value)
+{
+    return true;
+}
