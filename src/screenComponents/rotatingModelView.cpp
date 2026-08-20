@@ -13,7 +13,6 @@
 
 #include <algorithm>
 #include <array>
-#include <utility>
 
 #include <glm/glm.hpp>
 #include <glm/ext/matrix_transform.hpp>
@@ -165,20 +164,30 @@ void GuiRotatingModelView::onDraw(sp::RenderTarget& renderer)
         if (auto u = shader.get().uniform(ShaderRegistry::Uniforms::SpecularLightDirection); u != -1)
             glUniform3fv(u, 1, glm::value_ptr(debug_light_dir));
 
-        // Drop the currently bound texture back to non-mipmapped minification,
-        // remembering what it had so the world renderer is left untouched.
-        std::array<std::pair<sp::Texture*, GLint>, 4> restore_filters{};
+        // Drop the currently bound texture back to non-mipmapped, isotropic
+        // minification, remembering what it had so the world renderer is left
+        // untouched.
+        struct RestoreFilter { sp::Texture* texture; GLint min_filter; GLfloat anisotropy; };
+        std::array<RestoreFilter, 4> restore_filters{};
         size_t restore_count = 0;
-        auto suppressMipmaps = [this, &restore_filters, &restore_count](sp::Texture* texture)
+        const bool has_anisotropy = sp::gl::maxTextureAnisotropy > 1.0f;
+        auto suppressMipmaps = [this, &restore_filters, &restore_count, has_anisotropy](sp::Texture* texture)
         {
             if (debug_mipmap_filtering)
                 return;
-            GLint previous = GL_LINEAR;
-            glGetTexParameteriv(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, &previous);
-            if (previous == GL_LINEAR || previous == GL_NEAREST)
-                return; // No mip chain, nothing to suppress.
-            restore_filters[restore_count++] = {texture, previous};
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+            GLint min_filter = GL_LINEAR;
+            glGetTexParameteriv(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, &min_filter);
+            GLfloat anisotropy = 1.0f;
+            if (has_anisotropy)
+                glGetTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY_EXT, &anisotropy);
+            if ((min_filter == GL_LINEAR || min_filter == GL_NEAREST) && anisotropy <= 1.0f)
+                return; // Already the unmipmapped behaviour.
+            restore_filters[restore_count++] = {texture, min_filter, anisotropy};
+            // Keep the texel filter, drop only the mip lookup.
+            const bool smooth = min_filter == GL_LINEAR || min_filter == GL_LINEAR_MIPMAP_NEAREST || min_filter == GL_LINEAR_MIPMAP_LINEAR;
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, smooth ? GL_LINEAR : GL_NEAREST);
+            if (has_anisotropy)
+                glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY_EXT, 1.0f);
         };
 
         // Bind textures by ptr, skipping normal map when toggled off.
@@ -209,8 +218,11 @@ void GuiRotatingModelView::onDraw(sp::RenderTarget& renderer)
 
         for(size_t index=0; index<restore_count; index++)
         {
-            restore_filters[index].first->bind();
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, restore_filters[index].second);
+            const auto& restore = restore_filters[index];
+            restore.texture->bind();
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, restore.min_filter);
+            if (has_anisotropy)
+                glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY_EXT, restore.anisotropy);
         }
     }
 

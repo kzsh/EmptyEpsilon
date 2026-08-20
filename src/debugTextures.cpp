@@ -3,6 +3,7 @@
 #ifdef DEBUG
 #include <graphics/opengl.h>
 #include <graphics/texture.h>
+#include <textureManager.h>
 
 #include <array>
 #include <memory>
@@ -41,6 +42,13 @@ std::vector<uint8_t> makeSolid(uint32_t size, const std::array<uint8_t, 3>& colo
     return pixels;
 }
 
+// Match the texture_filtering preference, so the patterns show what game textures get.
+void applyFiltering(sp::BasicTexture& texture)
+{
+    texture.setMipmapFilter(textureManager.getDefaultMipmapFilter());
+    texture.setAnisotropy(textureManager.getDefaultAnisotropy());
+}
+
 }
 
 sp::Texture* getDebugCheckerTexture()
@@ -52,6 +60,7 @@ sp::Texture* getDebugCheckerTexture()
         texture->generateMipmaps();
         texture->setRepeated(true);
         texture->setSmooth(true);
+        applyFiltering(*texture);
     }
     return texture.get();
 }
@@ -87,6 +96,7 @@ sp::Texture* getDebugMipChartTexture()
         texture = std::make_unique<sp::BasicTexture>(levels, GL_RGBA);
         texture->setRepeated(true);
         texture->setSmooth(true);
+        applyFiltering(*texture);
     }
     return texture.get();
 }

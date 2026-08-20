@@ -221,6 +221,8 @@ set(MAIN_SOURCES
     src/init/displaywindows.cpp
     src/init/ecs.h
     src/init/ecs.cpp
+    src/init/textureFiltering.h
+    src/init/textureFiltering.cpp
 
     src/main.cpp
     src/threatLevelEstimate.cpp

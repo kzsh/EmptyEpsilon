@@ -28,6 +28,7 @@
 #include "init/resources.h"
 #include "init/displaywindows.h"
 #include "init/ecs.h"
+#include "init/textureFiltering.h"
 #include "stdinLuaConsole.h"
 
 #include "graphics/opengl.h"
@@ -152,6 +153,7 @@ int main(int argc, char** argv)
     initResourcePaths();
     textureManager.setDefaultSmooth(true);
     textureManager.setDefaultRepeated(true);
+    applyTextureFilteringPreference();
     i18n::load("locale/main." + PreferencesManager::get("language", "en") + ".po");
     keys.init();
     if (PreferencesManager::get("httpserver").toInt() != 0)

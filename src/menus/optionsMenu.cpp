@@ -7,6 +7,8 @@
 #include "soundManager.h"
 #include "windowManager.h"
 #include "scenarioInfo.h"
+#include "init/textureFiltering.h"
+#include "graphics/opengl.h"
 
 #include "gui/theme.h"
 #include "gui/gui2_overlay.h"
@@ -363,6 +365,37 @@ void OptionsMenu::setupGraphicsOptions()
         ->setSize(GuiElement::GuiSizeMax, 50.0f);
 
     (new GuiLabel(graphics_page, "THEME_APPLICATION_LABEL", tr("Restart EmptyEpsilon to apply FSAA change"), 20.0f))
+        ->setSize(GuiElement::GuiSizeMax, 30.0f);
+
+    // Texture filtering selector, offering only the anisotropic levels the
+    // driver supports.
+    std::vector<string> filtering_labels;
+    std::vector<string> filtering_values;
+    for (const auto& mode : textureFilteringModes())
+    {
+        if (mode.anisotropy > sp::gl::maxTextureAnisotropy)
+            break;
+        if (mode.anisotropy > 1.0f)
+            filtering_labels.push_back(tr("Textures: {amount}x anisotropic").format({{"amount", string(int(mode.anisotropy))}}));
+        else if (mode.mipmaps == sp::MipmapFilter::Linear)
+            filtering_labels.push_back(tr("Textures: trilinear"));
+        else if (mode.mipmaps == sp::MipmapFilter::Nearest)
+            filtering_labels.push_back(tr("Textures: bilinear"));
+        else
+            filtering_labels.push_back(tr("Textures: no mipmaps"));
+        filtering_values.push_back(mode.key);
+    }
+    // A saved level above the driver maximum is clamped at load, which is the
+    // last offered level.
+    const auto filtering_index = std::min(savedTextureFilteringIndex(), filtering_values.size() - 1);
+    (new GuiSelector(graphics_page, "TEXTURE_FILTERING", [](int index, string value) {
+        PreferencesManager::set("texture_filtering", value);
+    }))
+        ->setOptions(filtering_labels, filtering_values)
+        ->setSelectionIndex(static_cast<int>(filtering_index))
+        ->setSize(GuiElement::GuiSizeMax, 50.0f);
+
+    (new GuiLabel(graphics_page, "TEXTURE_FILTERING_APPLICATION_LABEL", tr("Restart EmptyEpsilon to apply texture filtering change"), 20.0f))
         ->setSize(GuiElement::GuiSizeMax, 30.0f);
 
     // FoV slider.
