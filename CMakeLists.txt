@@ -236,6 +236,7 @@ set(MAIN_SOURCES
     src/playerInfo.cpp
     src/missileWeaponData.cpp
     src/mesh.cpp
+    src/debugTextures.cpp
     src/scenarioInfo.cpp
     src/tutorialGame.cpp
     src/shaderRegistry.cpp
