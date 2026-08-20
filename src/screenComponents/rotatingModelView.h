@@ -17,6 +17,10 @@ private:
     bool is_dragging = false;
     glm::vec2 mouse_down_position{0.0f, 0.0f};
 
+    // Height at the bottom of the element the 3D viewport keeps clear, so a
+    // subclass can put controls there without covering the model.
+    float bottom_inset = 0.0f;
+
     // Manual rotation defaults
     bool manual_rotation_allowed = true;
     bool manual_rotation_mode = false;
@@ -24,7 +28,22 @@ private:
     float manual_rotation_z = 0.0f;
 
 #ifdef DEBUG
+public:
+    enum class DebugBaseTexture
+    {
+        Model = 0,
+        Checker,
+        MipChart,
+    };
+
+private:
     bool debug_show_normal_map = true;
+    // Swaps the base map for a procedural pattern, so mip behaviour can be read
+    // off the model instead of guessed at.
+    DebugBaseTexture debug_base_texture = DebugBaseTexture::Model;
+    // Forces GL_LINEAR minification on this draw, i.e. what the renderer did
+    // before the textures carried mip chains.
+    bool debug_mipmap_filtering = true;
     // Azimuth: degrees around Z axis (0 = forward, 90 = right).
     // Elevation: degrees from the horizontal plane, -90..90
     // (0 = flat, 90 = straight down from above, -90 = straight up from below).
@@ -44,9 +63,12 @@ public:
     GuiRotatingModelView* setFillPercentage(float percentage);
     GuiRotatingModelView* setZoom(float zoom);
     GuiRotatingModelView* setManualRotationAllowed(bool allowed);
+    GuiRotatingModelView* setBottomInset(float height);
 
 #ifdef DEBUG
     GuiRotatingModelView* setDebugShowNormalMap(bool show) { debug_show_normal_map = show; return this; }
+    GuiRotatingModelView* setDebugBaseTexture(DebugBaseTexture texture) { debug_base_texture = texture; return this; }
+    GuiRotatingModelView* setDebugMipmapFiltering(bool enabled) { debug_mipmap_filtering = enabled; return this; }
     GuiRotatingModelView* setDebugLightAzimuth(float degrees) { debug_light_azimuth = degrees; return this; }
     GuiRotatingModelView* setDebugLightElevation(float degrees) { debug_light_elevation = degrees; return this; }
 #endif

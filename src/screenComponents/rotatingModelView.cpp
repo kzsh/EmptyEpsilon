@@ -5,12 +5,15 @@
 #include "rotatingModelView.h"
 
 #include "textureManager.h"
+#include "debugTextures.h"
 
 #include "glObjects.h"
 #include "shaderRegistry.h"
 #include "systems/rendering.h"
 
+#include <algorithm>
 #include <array>
+#include <utility>
 
 #include <glm/glm.hpp>
 #include <glm/ext/matrix_transform.hpp>
@@ -22,6 +25,7 @@
 #include "gui/gui2_slider.h"
 #include "gui/gui2_label.h"
 #include "gui/gui2_togglebutton.h"
+#include "gui/gui2_selector.h"
 #endif
 
 GuiRotatingModelView::GuiRotatingModelView(GuiContainer* owner, string id, sp::ecs::Entity& entity)
@@ -39,9 +43,15 @@ void GuiRotatingModelView::onDraw(sp::RenderTarget& renderer)
 
     renderer.finish();
 
+    // The model gets the element minus whatever a subclass reserved at the
+    // bottom for its own controls.
+    auto view_rect = rect;
+    view_rect.size.y = rect.size.y - bottom_inset;
+    if (view_rect.size.y <= 0.f) return;
+
     float camera_fov = 60.0f;
-    auto p0 = renderer.virtualToPixelPosition(rect.position);
-    auto p1 = renderer.virtualToPixelPosition(rect.position + rect.size);
+    auto p0 = renderer.virtualToPixelPosition(view_rect.position);
+    auto p1 = renderer.virtualToPixelPosition(view_rect.position + view_rect.size);
     glViewport(p0.x, renderer.getPhysicalSize().y - p1.y, p1.x - p0.x, p1.y - p0.y);
 
     if (GLAD_GL_ES_VERSION_2_0)
@@ -57,7 +67,7 @@ void GuiRotatingModelView::onDraw(sp::RenderTarget& renderer)
     auto mesh_radius = mrc->getMesh()->greatest_distance_from_center * mrc->scale;
     float near_clip_boundary = 1.f;
 
-    float aspect_ratio = rect.size.x / rect.size.y;
+    float aspect_ratio = view_rect.size.x / view_rect.size.y;
     auto projection_matrix = glm::perspective(glm::radians(camera_fov), aspect_ratio, near_clip_boundary, 25000.f);
 
     // Calculate distance needed to fit the model in both dimensions based on
@@ -115,10 +125,18 @@ void GuiRotatingModelView::onDraw(sp::RenderTarget& renderer)
         mrc->getIlluminationTexture();
         mrc->getTexture();
 
+        sp::Texture* base_texture = mrc->texture.ptr;
+        switch(debug_base_texture)
+        {
+        case DebugBaseTexture::Checker: base_texture = getDebugCheckerTexture(); break;
+        case DebugBaseTexture::MipChart: base_texture = getDebugMipChartTexture(); break;
+        case DebugBaseTexture::Model: break;
+        }
+
         const bool use_normal       = debug_show_normal_map && (mrc->normal_texture.ptr != nullptr);
         const bool use_specular     = (mrc->specular_texture.ptr != nullptr);
         const bool use_illumination = (mrc->illumination_texture.ptr != nullptr);
-        const bool use_texture      = (mrc->texture.ptr != nullptr);
+        const bool use_texture      = (base_texture != nullptr);
 
         auto shader_id = ShaderRegistry::Shaders::Object;
         if (use_normal) {
@@ -147,26 +165,53 @@ void GuiRotatingModelView::onDraw(sp::RenderTarget& renderer)
         if (auto u = shader.get().uniform(ShaderRegistry::Uniforms::SpecularLightDirection); u != -1)
             glUniform3fv(u, 1, glm::value_ptr(debug_light_dir));
 
+        // Drop the currently bound texture back to non-mipmapped minification,
+        // remembering what it had so the world renderer is left untouched.
+        std::array<std::pair<sp::Texture*, GLint>, 4> restore_filters{};
+        size_t restore_count = 0;
+        auto suppressMipmaps = [this, &restore_filters, &restore_count](sp::Texture* texture)
+        {
+            if (debug_mipmap_filtering)
+                return;
+            GLint previous = GL_LINEAR;
+            glGetTexParameteriv(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, &previous);
+            if (previous == GL_LINEAR || previous == GL_NEAREST)
+                return; // No mip chain, nothing to suppress.
+            restore_filters[restore_count++] = {texture, previous};
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        };
+
         // Bind textures by ptr, skipping normal map when toggled off.
-        if (use_texture)
-            mrc->texture.ptr->bind();
+        if (use_texture) {
+            base_texture->bind();
+            suppressMipmaps(base_texture);
+        }
         if (use_specular) {
             glActiveTexture(GL_TEXTURE0 + ShaderRegistry::textureIndex(ShaderRegistry::Textures::SpecularMap));
             mrc->specular_texture.ptr->bind();
+            suppressMipmaps(mrc->specular_texture.ptr);
         }
         if (use_illumination) {
             glActiveTexture(GL_TEXTURE0 + ShaderRegistry::textureIndex(ShaderRegistry::Textures::IlluminationMap));
             mrc->illumination_texture.ptr->bind();
+            suppressMipmaps(mrc->illumination_texture.ptr);
         }
         if (use_normal) {
             glActiveTexture(GL_TEXTURE0 + ShaderRegistry::textureIndex(ShaderRegistry::Textures::NormalMap));
             mrc->normal_texture.ptr->bind();
+            suppressMipmaps(mrc->normal_texture.ptr);
         }
 
         drawMesh(*mrc, shader);
 
-        if (use_specular || use_illumination)
+        if (use_specular || use_illumination || use_normal)
             glActiveTexture(GL_TEXTURE0);
+
+        for(size_t index=0; index<restore_count; index++)
+        {
+            restore_filters[index].first->bind();
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, restore_filters[index].second);
+        }
     }
 
     // Billboard circle at the light source position.
@@ -275,6 +320,12 @@ GuiRotatingModelView* GuiRotatingModelView::setManualRotationAllowed(bool allowe
     return this;
 }
 
+GuiRotatingModelView* GuiRotatingModelView::setBottomInset(float height)
+{
+    bottom_inset = std::max(0.0f, height);
+    return this;
+}
+
 bool GuiRotatingModelView::onMouseDown(sp::io::Pointer::Button button, glm::vec2 position, sp::io::Pointer::ID id)
 {
     if (!manual_rotation_allowed || button != sp::io::Pointer::Button::Left) return false;
@@ -345,39 +396,78 @@ void GuiRotatingModelView::onMouseUp(glm::vec2 position, sp::io::Pointer::ID id)
 GuiRotatingModelDebugView::GuiRotatingModelDebugView(GuiContainer* owner, string id, sp::ecs::Entity& entity)
 : GuiRotatingModelView(owner, id, entity)
 {
-    constexpr float panel_h = 80.f;
-    constexpr float ctrl_w  = 160.f;
     constexpr float label_h = 20.f;
-    constexpr float ctrl_h  = panel_h - label_h - 8.f;
+    constexpr float row_h = 56.f;
+    constexpr float row_gap = 10.f;
+    constexpr float panel_margin = 8.f;
+    constexpr float panel_h = row_h * 2.f + row_gap + panel_margin * 2.f;
 
+    // Two rows of equal-width cells, laid out by the gui layout engine so the
+    // controls follow the width of whatever container the view sits in.
     auto* panel = (new GuiPanel(this, id + "_DEBUG_PANEL"))
         ->setPosition(0.f, 0.f, sp::Alignment::BottomLeft)
         ->setSize(GuiElement::GuiSizeMax, panel_h);
+    auto* rows = new GuiElement(panel, id + "_DEBUG_ROWS");
+    rows->setSize(GuiElement::GuiSizeMax, GuiElement::GuiSizeMax)
+        ->setAttribute("layout", "vertical");
+    rows->setAttribute("margin", string(panel_margin));
+
+    // Keep the 3D viewport above the panel.
+    setBottomInset(panel_h);
+
+    const auto addRow = [&](const string& row_id, float gap_below)
+    {
+        auto* row = new GuiElement(rows, row_id);
+        row->setSize(GuiElement::GuiSizeMax, row_h)->setAttribute("layout", "horizontal");
+        // margin: left/right, top, bottom
+        row->setAttribute("margin", "0, 0, " + string(gap_below));
+        return row;
+    };
+
+    // Cells share the row width evenly; each holds an optional caption above
+    // its control.
+    const auto addCell = [&](GuiElement* row, const string& cell_id, const string& caption)
+    {
+        auto* cell = new GuiElement(row, cell_id);
+        cell->setSize(GuiElement::GuiSizeMax, row_h)->setAttribute("layout", "vertical");
+        cell->setAttribute("margin", "4");
+        if (caption.empty())
+            (new GuiElement(cell, cell_id + "_SPACER"))->setSize(GuiElement::GuiSizeMax, label_h);
+        else
+            (new GuiLabel(cell, cell_id + "_LABEL", caption, label_h))->setSize(GuiElement::GuiSizeMax, label_h);
+        return cell;
+    };
+
+    auto* top_row = addRow(id + "_ROW_TOP", row_gap);
 
     // Toggles the normal map off so its contribution can be judged against the
     // flat-shaded model. State is shown by the toggle style, not the text.
-    (new GuiToggleButton(panel, id + "_NM_BTN", "Normal map",
+    (new GuiToggleButton(addCell(top_row, id + "_NM", ""), id + "_NM_BTN", "Normal map",
         [this](bool active) { setDebugShowNormalMap(active); }))
         ->setValue(true)
-        ->setPosition(8.f, label_h + 4.f, sp::Alignment::TopLeft)
-        ->setSize(ctrl_w, ctrl_h);
+        ->setSize(GuiElement::GuiSizeMax, GuiElement::GuiSizeMax);
 
-    constexpr float az_x = ctrl_w + 24.f;
-    (new GuiLabel(panel, id + "_AZ_LABEL", "Light azimuth", label_h))
-        ->setPosition(az_x, 4.f, sp::Alignment::TopLeft)
-        ->setSize(ctrl_w, label_h);
-    (new GuiSlider(panel, id + "_AZ_SLIDER", -180.f, 180.f, 45.f,
+    // Off reverts minification to GL_LINEAR for this draw only, which is how
+    // the model looked before textures carried mip chains.
+    (new GuiToggleButton(addCell(top_row, id + "_MIP", ""), id + "_MIP_BTN", "Mipmaps",
+        [this](bool active) { setDebugMipmapFiltering(active); }))
+        ->setValue(true)
+        ->setSize(GuiElement::GuiSizeMax, GuiElement::GuiSizeMax);
+
+    (new GuiSelector(addCell(top_row, id + "_TEX", "Base map"), id + "_TEX_SELECTOR",
+        [this](int index, string) { setDebugBaseTexture(static_cast<DebugBaseTexture>(index)); }))
+        ->setOptions({"Model", "Checker", "Mip chart"})
+        ->setSelectionIndex(0)
+        ->setSize(GuiElement::GuiSizeMax, GuiElement::GuiSizeMax);
+
+    auto* bottom_row = addRow(id + "_ROW_BOTTOM", 0.f);
+
+    (new GuiSlider(addCell(bottom_row, id + "_AZ", "Light azimuth"), id + "_AZ_SLIDER", -180.f, 180.f, 45.f,
         [this](float value) { setDebugLightAzimuth(value); }))
-        ->setPosition(az_x, label_h + 4.f, sp::Alignment::TopLeft)
-        ->setSize(ctrl_w, ctrl_h);
+        ->setSize(GuiElement::GuiSizeMax, GuiElement::GuiSizeMax);
 
-    constexpr float el_x = az_x + ctrl_w + 16.f;
-    (new GuiLabel(panel, id + "_EL_LABEL", "Light elevation", label_h))
-        ->setPosition(el_x, 4.f, sp::Alignment::TopLeft)
-        ->setSize(ctrl_w, label_h);
-    (new GuiSlider(panel, id + "_EL_SLIDER", -90.f, 90.f, 45.f,
+    (new GuiSlider(addCell(bottom_row, id + "_EL", "Light elevation"), id + "_EL_SLIDER", -90.f, 90.f, 45.f,
         [this](float value) { setDebugLightElevation(value); }))
-        ->setPosition(el_x, label_h + 4.f, sp::Alignment::TopLeft)
-        ->setSize(ctrl_w, ctrl_h);
+        ->setSize(GuiElement::GuiSizeMax, GuiElement::GuiSizeMax);
 }
 #endif
