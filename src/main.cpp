@@ -143,6 +143,9 @@ int main(int argc, char** argv)
     initResourcePaths();
     textureManager.setDefaultSmooth(true);
     textureManager.setDefaultRepeated(true);
+    // Undocumented escape hatch, for comparing against the unmipmapped behaviour.
+    textureManager.setDefaultMipmaps(PreferencesManager::get("texture_mipmaps", "1").toInt() != 0);
+    LOG(INFO) << "Texture mipmaps: " << (textureManager.isDefaultMipmapped() ? "on" : "off");
     i18n::load("locale/main." + PreferencesManager::get("language", "en") + ".po");
     keys.init();
     if (PreferencesManager::get("httpserver").toInt() != 0)
