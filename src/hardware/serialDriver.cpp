@@ -1,4 +1,13 @@
 #include "logging.h"
+// The macOS serial implementation relies on IOKit serial APIs, which do not
+// exist on iOS. EE_MACOS_SERIAL is defined only on real macOS; on iOS the
+// SerialPort methods fall back to empty/unsupported bodies (as on Android).
+#if defined(__APPLE__) && defined(__MACH__)
+    #include <TargetConditionals.h>
+    #if !TARGET_OS_IPHONE
+        #define EE_MACOS_SERIAL 1
+    #endif
+#endif
 #ifdef _WIN32
     #include <windows.h>
 #endif
@@ -17,7 +26,7 @@
     #include <unistd.h>
     #include <dirent.h>
 #endif
-#if defined(__APPLE__) && defined(__MACH__)
+#if defined(EE_MACOS_SERIAL)
     #include <IOKit/serial/ioss.h>
     #include <sys/ioctl.h>
     #include <fcntl.h>
@@ -57,7 +66,7 @@ SerialPort::SerialPort(string name)
         }
     }
 #endif
-#if defined(__gnu_linux__) || (defined(__APPLE__) && defined(__MACH__))
+#if defined(__gnu_linux__) || (defined(EE_MACOS_SERIAL))
     if (!name.startswith("/dev/"))
         name = "/dev/" + name;
     handle = open(name.c_str(), O_RDWR | O_NOCTTY | O_NDELAY);
@@ -76,7 +85,7 @@ SerialPort::~SerialPort()
     CloseHandle(handle);
     handle = INVALID_HANDLE_VALUE;
 #endif
-#if defined(__gnu_linux__) || (defined(__APPLE__) && defined(__MACH__))
+#if defined(__gnu_linux__) || (defined(EE_MACOS_SERIAL))
     close(handle);
     handle = 0;
 #endif
@@ -87,7 +96,7 @@ bool SerialPort::isOpen()
 #ifdef _WIN32
     return handle != INVALID_HANDLE_VALUE;
 #endif
-#if defined(__gnu_linux__) || (defined(__APPLE__) && defined(__MACH__))
+#if defined(__gnu_linux__) || (defined(EE_MACOS_SERIAL))
     return handle;
 #endif
     return false;
@@ -229,7 +238,7 @@ void SerialPort::configure(int baudrate, int databits, EParity parity, EStopBits
 
     ioctl(handle, TCSETS2, &tio);
 #endif
-#if defined(__APPLE__) && defined(__MACH__)
+#if defined(EE_MACOS_SERIAL)
     struct termios tio;
     tcgetattr(handle, &tio);
 
@@ -317,7 +326,7 @@ void SerialPort::send(void* data, int data_size)
         data_size -= written;
     }
 #endif
-#if defined(__gnu_linux__) || (defined(__APPLE__) && defined(__MACH__))
+#if defined(__gnu_linux__) || (defined(EE_MACOS_SERIAL))
     while(data_size > 0)
     {
         int written = write(handle, data, data_size);
@@ -345,7 +354,7 @@ int SerialPort::recv(void* data, int data_size)
     }
     return read_size;
 #endif
-#if defined(__gnu_linux__) || (defined(__APPLE__) && defined(__MACH__))
+#if defined(__gnu_linux__) || (defined(EE_MACOS_SERIAL))
     int bytes_read = read(handle, data, data_size);
     if (bytes_read > 0)
         return bytes_read;
@@ -365,7 +374,7 @@ void SerialPort::setDTR()
     int bit = TIOCM_DTR;
     ioctl(handle, TIOCMBIS, &bit);
 #endif
-#if defined(__APPLE__) && defined(__MACH__)
+#if defined(EE_MACOS_SERIAL)
     ioctl(handle, TIOCSDTR);
 #endif
 }
@@ -381,7 +390,7 @@ void SerialPort::clearDTR()
     int bit = TIOCM_DTR;
     ioctl(handle, TIOCMBIC, &bit);
 #endif
-#if defined(__APPLE__) && defined(__MACH__)
+#if defined(EE_MACOS_SERIAL)
     ioctl(handle, TIOCCDTR);
 #endif
 }
@@ -397,7 +406,7 @@ void SerialPort::setRTS()
     int bit = TIOCM_RTS;
     ioctl(handle, TIOCMBIS, &bit);
 #endif
-#if defined(__APPLE__) && defined(__MACH__)
+#if defined(EE_MACOS_SERIAL)
     ioctl(handle, TIOCM_RTS);
 #endif
 }
@@ -413,7 +422,7 @@ void SerialPort::clearRTS()
     int bit = TIOCM_RTS;
     ioctl(handle, TIOCMBIC, &bit);
 #endif
-#if defined(__APPLE__) && defined(__MACH__)
+#if defined(EE_MACOS_SERIAL)
     ioctl(handle, TIOCM_RTS);
 #endif
 }
@@ -425,7 +434,7 @@ void SerialPort::sendBreak()
     Sleep(1);
     ClearCommBreak(handle);
 #endif
-#if (defined(__gnu_linux__) && !defined(ANDROID)) || (defined(__APPLE__) && defined(__MACH__))
+#if (defined(__gnu_linux__) && !defined(ANDROID)) || (defined(EE_MACOS_SERIAL))
     ioctl(handle, TIOCSBRK);
     usleep(100);
     ioctl(handle, TIOCCBRK);
@@ -524,7 +533,7 @@ string SerialPort::getPseudoDriverName(string port)
     fclose(f);
     return string(buffer);
 #endif
-#if defined(__APPLE__) && defined(__MACH__)
+#if defined(EE_MACOS_SERIAL)
     FILE* f = fopen(("/dev/tty." + port).c_str(), "rt");
     if (!f)
         return "";

@@ -1,7 +1,7 @@
 # Set minimum target macOS version: https://cmake.org/cmake/help/v3.8/variable/CMAKE_OSX_DEPLOYMENT_TARGET.html#variable:CMAKE_OSX_DEPLOYMENT_TARGET
 # SDL2 targets 10.5, however EE targets C++17 features only available in 10.15+ (Catalina, June 2019).
 # Must be first!
-if(APPLE)
+if(APPLE AND NOT IOS)
   if(NOT DEFINED ENV{MACOSX_DEPLOYMENT_TARGET})
     set(ENV{MACOSX_DEPLOYMENT_TARGET} "10.15")
   endif()
@@ -66,6 +66,21 @@ endif()
 
 # SeriousProton
 add_subdirectory("${SERIOUS_PROTON_DIR}" "${PROJECT_BINARY_DIR}/SeriousProton" EXCLUDE_FROM_ALL)
+
+# FreeType's bundled zlib (libs/freetype2/src/gzip/ftzconf.h) fails to compile on
+# Apple platforms: it skips its own `Byte` typedef whenever TARGET_OS_MAC is
+# defined (true for macOS *and* iOS), expecting Carbon's MacTypes.h to provide
+# it - which isn't included here. Route FreeType through the platform zlib
+# instead. Only applies when the bundled FreeType target is actually in use.
+if(APPLE AND TARGET spfreetype2)
+    target_compile_definitions(spfreetype2 PRIVATE FT_CONFIG_OPTION_SYSTEM_ZLIB)
+    # spfreetype2 is defined in the SeriousProton subdirectory; linking to it
+    # from here requires CMP0079 (CMake >= 3.13).
+    if(POLICY CMP0079)
+        cmake_policy(SET CMP0079 NEW)
+    endif()
+    target_link_libraries(spfreetype2 PRIVATE z)
+endif()
 
 set(EXTERNALS_DIR "${PROJECT_BINARY_DIR}/externals")
 set(DOWNLOADS_DIR "${PROJECT_BINARY_DIR}/downloads")
@@ -714,10 +729,82 @@ if(MSVC)
     set_source_files_properties(src/screens/gm/tweak.cpp PROPERTIES COMPILE_FLAGS "/bigobj")
 endif()
 
-set_target_properties(${PROJECT_NAME}
-    PROPERTIES
-        MACOSX_BUNDLE_INFO_PLIST ${CMAKE_SOURCE_DIR}/osx/MacOSXBundleInfo.plist.in
-        MACOSX_BUNDLE_ICON_FILE "${PROJECT_NAME}.icns")
+if(IOS)
+    set_target_properties(${PROJECT_NAME}
+        PROPERTIES
+            MACOSX_BUNDLE_INFO_PLIST ${CMAKE_SOURCE_DIR}/osx/iOSBundleInfo.plist.in
+            MACOSX_BUNDLE_GUI_IDENTIFIER "io.github.daid.EmptyEpsilon"
+            MACOSX_BUNDLE_BUNDLE_NAME "EmptyEpsilon"
+            MACOSX_BUNDLE_SHORT_VERSION_STRING "${PROJECT_VERSION}"
+            MACOSX_BUNDLE_BUNDLE_VERSION "${PROJECT_VERSION}"
+            XCODE_ATTRIBUTE_PRODUCT_BUNDLE_IDENTIFIER "io.github.daid.EmptyEpsilon"
+            XCODE_ATTRIBUTE_TARGETED_DEVICE_FAMILY "1,2")
+
+    # Determine platform-specific Info.plist values (device vs simulator).
+    # NB: by the time this runs, CMAKE_OSX_SYSROOT is the resolved SDK *path*
+    # (e.g. .../iPhoneSimulator26.1.sdk), and MATCHES is case-sensitive - so we
+    # lower-case it and also honour IOS_PLATFORM from the toolchain.
+    string(TOLOWER "${CMAKE_OSX_SYSROOT}" _ee_sysroot_lc)
+    if(IOS_PLATFORM MATCHES "SIMULATOR" OR _ee_sysroot_lc MATCHES "simulator")
+        set(EE_IOS_SUPPORTED_PLATFORM "iPhoneSimulator")
+        set(EE_IOS_DTPLATFORM_NAME "iphonesimulator")
+    else()
+        set(EE_IOS_SUPPORTED_PLATFORM "iPhoneOS")
+        set(EE_IOS_DTPLATFORM_NAME "iphoneos")
+    endif()
+    if(CMAKE_OSX_DEPLOYMENT_TARGET)
+        set(EE_IOS_MIN_OS "${CMAKE_OSX_DEPLOYMENT_TARGET}")
+    else()
+        set(EE_IOS_MIN_OS "13.0")
+    endif()
+
+    # On iOS the app bundle is flat: the engine chdir()s to
+    # CFBundleCopyResourcesDirectoryURL() (the bundle root) and then loads
+    # "resources/", "scripts/" and "packs/" relative to it. Copy those folders
+    # into the bundle after linking. (We use a post-build copy rather than Xcode
+    # "folder references" because the iOS build uses the Ninja generator.)
+    #
+    # We also inject the Info.plist keys that Xcode would normally add during its
+    # "Process Info.plist" step but that a plain Ninja/clang build omits. Without
+    # CFBundleSupportedPlatforms / MinimumOSVersion / UIDeviceFamily, iOS installd
+    # rejects the bundle (misleadingly reporting a "Missing bundle ID" error).
+    # IMPORTANT: assets go under a "Data/" subdirectory, NOT the bundle root.
+    # A top-level "resources/" folder collides case-insensitively with the
+    # reserved macOS bundle "Resources/" directory, which makes CFBundle/installd
+    # misdetect the bundle layout and refuse to install it ("Missing bundle ID").
+    # The app chdir()s into Data/ at startup (see src/main.cpp).
+    set(EE_IOS_PLIST "$<TARGET_BUNDLE_CONTENT_DIR:${PROJECT_NAME}>/Info.plist")
+    set(EE_IOS_DATA_DIR "$<TARGET_BUNDLE_DIR:${PROJECT_NAME}>/Data")
+    add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_directory
+            "${CMAKE_SOURCE_DIR}/resources" "${EE_IOS_DATA_DIR}/resources"
+        COMMAND ${CMAKE_COMMAND} -E copy_directory
+            "${CMAKE_SOURCE_DIR}/scripts" "${EE_IOS_DATA_DIR}/scripts"
+        COMMAND bash "${CMAKE_SOURCE_DIR}/osx/finalize-ios-plist.sh"
+            "${EE_IOS_PLIST}" "${EE_IOS_SUPPORTED_PLATFORM}" "${EE_IOS_MIN_OS}" "${EE_IOS_DTPLATFORM_NAME}"
+        COMMENT "Copying resources (into Data/) and finalizing Info.plist for the iOS app bundle")
+
+    # The 3D model packs are large (~200MB) and optional. Skip them for faster
+    # sign/install cycles with -DIOS_WITH_PACKS=OFF; the game still runs, but
+    # 3D views fall back to placeholder models. (Mirrors Android's APK_WITH_PACKS.)
+    option(IOS_WITH_PACKS "Bundle the 3D asset packs into the iOS app" ON)
+    if(IOS_WITH_PACKS)
+        add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E copy_directory
+                "${CMAKE_SOURCE_DIR}/packs" "${EE_IOS_DATA_DIR}/packs"
+            COMMENT "Copying 3D asset packs into the iOS app bundle (Data/packs)")
+    else()
+        # Ensure a stale packs/ dir from a previous build doesn't linger.
+        add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E rm -rf "${EE_IOS_DATA_DIR}/packs"
+            COMMENT "Skipping 3D asset packs (IOS_WITH_PACKS=OFF)")
+    endif()
+else()
+    set_target_properties(${PROJECT_NAME}
+        PROPERTIES
+            MACOSX_BUNDLE_INFO_PLIST ${CMAKE_SOURCE_DIR}/osx/MacOSXBundleInfo.plist.in
+            MACOSX_BUNDLE_ICON_FILE "${PROJECT_NAME}.icns")
+endif()
 
 include(InstallRequiredSystemLibraries)
 
@@ -731,6 +818,9 @@ if(WIN32 OR STEAMSDK)
       # Not all configuration emit a pdb (ie Release), make this optional.
       install(FILES "$<TARGET_PDB_FILE:${PROJECT_NAME}>" DESTINATION . OPTIONAL)
     endif()
+elseif(IOS)
+  # Resources are embedded into the app bundle as folder references (see the
+  # target setup above); nothing to install separately.
 elseif(APPLE)
   install(FILES logo.icns DESTINATION "$<TARGET_BUNDLE_CONTENT_DIR:${PROJECT_NAME}>/Resources" RENAME "${PROJECT_NAME}.icns")
   install(DIRECTORY ${EE_RESOURCES} DESTINATION "$<TARGET_BUNDLE_CONTENT_DIR:${PROJECT_NAME}>/Resources")
@@ -774,9 +864,9 @@ if(Python3_Interpreter_FOUND)
   # Matches install logic above.
   if(WIN32 OR STEAMSDK)
     install(FILES "${SCRIPT_REFERENCE_HTML}" DESTINATION . OPTIONAL)
-  elseif(APPLE)
+  elseif(APPLE AND NOT IOS)
     install(FILES "${SCRIPT_REFERENCE_HTML}" DESTINATION "$<TARGET_BUNDLE_CONTENT_DIR:${PROJECT_NAME}>/Resources" OPTIONAL)
-  elseif(NOT ANDROID)
+  elseif(NOT ANDROID AND NOT IOS)
     # DOCDIR already has PROJECT_NAME (EmptyEpsilon) appended (from CMake docs)
     install(FILES "${SCRIPT_REFERENCE_HTML}" DESTINATION "${CMAKE_INSTALL_DOCDIR}" OPTIONAL)
   endif()
@@ -787,7 +877,7 @@ add_custom_target(update_locale
     COMMAND python3 update_locale.py
     WORKING_DIRECTORY ${PROJECT_SOURCE_DIR})
 
-if(APPLE)
+if(APPLE AND NOT IOS)
   # This *MUST* be the last install target.
   # Otherwise, for some messed up reason,
   # other install targets will not be accounted for when creating a DMG bundle.
@@ -820,6 +910,11 @@ set(CPACK_WIX_PRODUCT_ICON "${CMAKE_CURRENT_SOURCE_DIR}/logo.ico")
 if(NOT DEFINED CPACK_GENERATOR)
   if(WIN32 OR STEAMSDK)
     set(CPACK_GENERATOR "ZIP")
+  elseif(IOS)
+    # iOS apps are packaged/signed via Xcode (.ipa), not CPack.
+    set(CPACK_GENERATOR "")
+  elseif(APPLE)
+    set(CPACK_GENERATOR "DragNDrop")
   elseif(UNIX)
     set(CPACK_GENERATOR "DEB")
     set(CPACK_DEBIAN_PACKAGE_DEPENDS "libfreetype6, libsdl2-2.0-0")
@@ -830,7 +925,7 @@ endif()
 configure_file("${CMAKE_CURRENT_SOURCE_DIR}/cmake/CPackProjectConfig.cmake.in" "${PROJECT_BINARY_DIR}/CPackProjectConfig.cmake" @ONLY)
 set(CPACK_PROJECT_CONFIG_FILE "${PROJECT_BINARY_DIR}/CPackProjectConfig.cmake")
 
-if(APPLE)
+if(APPLE AND NOT IOS)
   if("DragNDrop" IN_LIST CPACK_GENERATOR)
     if(SDL2_LIBRARIES MATCHES "\\.framework$")
       # SDL2_LIBRARIES points to the framework itself.

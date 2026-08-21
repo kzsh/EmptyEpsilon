@@ -85,6 +85,16 @@ int runProxyServer()
     return 0;
 }
 
+// On iOS, SDL owns the real entry point (it sets up UIApplicationMain and then
+// calls SDL_main). Including SDL_main.h renames our main() to SDL_main so the
+// SDL2main static library links correctly. No-op on other platforms.
+#if defined(__APPLE__)
+#include <TargetConditionals.h>
+#if TARGET_OS_IPHONE
+#include <SDL_main.h>
+#endif
+#endif
+
 int main(int argc, char** argv)
 {
 #ifdef DEBUG
@@ -103,6 +113,16 @@ int main(int argc, char** argv)
 
     LOG(Info, "Starting...");
     new Engine();
+    // The Engine constructor chdir()s to the iOS app bundle root. Our assets
+    // live in a "Data/" subdirectory rather than at the bundle root, because a
+    // top-level "resources/" folder collides (case-insensitively) with the
+    // reserved macOS bundle "Resources/" name and breaks CFBundle/installd's
+    // bundle-type detection. Enter that subdirectory so the relative
+    // "resources/", "scripts/" and "packs/" paths resolve.
+#if defined(__APPLE__) && TARGET_OS_IPHONE
+    if (chdir("Data") != 0)
+        LOG(Warning, "Failed to chdir into iOS bundle Data directory.");
+#endif
     initSystemsAndComponents();
 
     auto configuration_path = initConfiguration(argc, argv);

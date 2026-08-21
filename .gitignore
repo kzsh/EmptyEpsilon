@@ -40,6 +40,15 @@ thumbs.db
 options.ini
 keybindings.json
 
+# Signing secrets / artifacts - never commit these
+*.p8
+*.mobileprovision
+*.entitlements
+*.ipa
+*.p12
+*.cer
+*.certSigningRequest
+
 
 .vscode
 logs
