@@ -709,6 +709,56 @@ if(WIN32)
     endif()
 endif()
 
+if(EMSCRIPTEN)
+    # Data files have to be baked into a .data bundle, there is no filesystem to
+    # read from. Music and the voice packs are left out by default, they are
+    # bigger than the rest of the game put together.
+    set(EE_WASM_PRELOAD_EXCLUDE "audio;music" CACHE STRING
+        "resources/ subdirectories left out of the wasm data bundle")
+    set(EE_WASM_SHELL "${CMAKE_CURRENT_SOURCE_DIR}/cmake/emscripten/shell.html" CACHE FILEPATH
+        "HTML shell the wasm build is wrapped in")
+
+    set(EE_WASM_PRELOAD "${CMAKE_CURRENT_SOURCE_DIR}/scripts@/scripts")
+    file(GLOB EE_WASM_RESOURCE_DIRS RELATIVE "${CMAKE_CURRENT_SOURCE_DIR}/resources" "${CMAKE_CURRENT_SOURCE_DIR}/resources/*")
+    foreach(entry IN LISTS EE_WASM_RESOURCE_DIRS)
+        if(IS_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/resources/${entry}")
+            if(NOT entry IN_LIST EE_WASM_PRELOAD_EXCLUDE)
+                list(APPEND EE_WASM_PRELOAD "${CMAKE_CURRENT_SOURCE_DIR}/resources/${entry}@/resources/${entry}")
+            endif()
+        endif()
+    endforeach()
+
+    # SHELL: keeps each flag/value pair together; CMake would otherwise collapse
+    # the repeated --preload-file flags into one.
+    set(EE_WASM_PRELOAD_FLAGS)
+    foreach(entry IN LISTS EE_WASM_PRELOAD)
+        list(APPEND EE_WASM_PRELOAD_FLAGS "SHELL:--preload-file ${entry}")
+    endforeach()
+    # Loose files in resources/ itself (fonts, shaders, the top level images).
+    file(GLOB EE_WASM_PRELOAD_LOOSE "${CMAKE_CURRENT_SOURCE_DIR}/resources/*.*")
+    foreach(entry IN LISTS EE_WASM_PRELOAD_LOOSE)
+        get_filename_component(entry_name "${entry}" NAME)
+        list(APPEND EE_WASM_PRELOAD_FLAGS "SHELL:--preload-file ${entry}@/resources/${entry_name}")
+    endforeach()
+
+    target_link_options(${PROJECT_NAME}
+        PUBLIC
+            "-sALLOW_MEMORY_GROWTH=1"
+            "-sINITIAL_MEMORY=536870912"
+            "-sSTACK_SIZE=4194304"
+            # EE draws from client side vertex arrays in several places, which
+            # WebGL does not allow; this emulates them.
+            "-sFULL_ES2=1"
+            # SDL2's emscripten GLES backend calls eglGetProcAddress.
+            "-sGL_ENABLE_GET_PROC_ADDRESS=1"
+            "SHELL:--shell-file ${EE_WASM_SHELL}"
+            ${EE_WASM_PRELOAD_FLAGS}
+    )
+    # Produce a runnable page rather than a bare module.
+    set_target_properties(${PROJECT_NAME} PROPERTIES SUFFIX ".html")
+    set_property(TARGET ${PROJECT_NAME} APPEND PROPERTY LINK_DEPENDS "${EE_WASM_SHELL}")
+endif()
+
 if(MSVC)
     # tweak.cpp exceeds the default COFF section limit
     set_source_files_properties(src/screens/gm/tweak.cpp PROPERTIES COMPILE_FLAGS "/bigobj")
