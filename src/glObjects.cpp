@@ -127,7 +127,7 @@ namespace gl
         for (auto wrap_axis : { GL_TEXTURE_WRAP_S, GL_TEXTURE_WRAP_T /*, GL_TEXTURE_WRAP_R*/ })
             glTexParameteri(GL_TEXTURE_CUBE_MAP, wrap_axis, GL_CLAMP_TO_EDGE);
 
-        if (GLAD_GL_ES_VERSION_2_0)
+        if (sp::gl::contextIsES)
             glGenerateMipmap(GL_TEXTURE_CUBE_MAP);
         glBindTexture(GL_TEXTURE_CUBE_MAP, GL_NONE);
 
