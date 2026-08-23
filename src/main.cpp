@@ -18,6 +18,7 @@
 #include "menus/autoConnectScreen.h"
 #include "menus/shipSelectionScreen.h"
 #include "main.h"
+#include "platform.h"
 #include "epsilonServer.h"
 #include "httpScriptAccess.h"
 #include "preferenceManager.h"
@@ -88,11 +89,8 @@ int runProxyServer()
 // On iOS, SDL owns the real entry point (it sets up UIApplicationMain and then
 // calls SDL_main). Including SDL_main.h renames our main() to SDL_main so the
 // SDL2main static library links correctly. No-op on other platforms.
-#if defined(__APPLE__)
-#include <TargetConditionals.h>
-#if TARGET_OS_IPHONE
+#if defined(EE_IOS)
 #include <SDL_main.h>
-#endif
 #endif
 
 int main(int argc, char** argv)
@@ -119,7 +117,7 @@ int main(int argc, char** argv)
     // reserved macOS bundle "Resources/" name and breaks CFBundle/installd's
     // bundle-type detection. Enter that subdirectory so the relative
     // "resources/", "scripts/" and "packs/" paths resolve.
-#if defined(__APPLE__) && TARGET_OS_IPHONE
+#if defined(EE_IOS)
     if (chdir("Data") != 0)
         LOG(Warning, "Failed to chdir into iOS bundle Data directory.");
 #endif
@@ -220,10 +218,10 @@ int main(int argc, char** argv)
     main_font->setBaselineOffset(active_theme->getStyle("base")->get(GuiElement::State::Normal).font_offset);
     bold_font->setBaselineOffset(active_theme->getStyle("bold")->get(GuiElement::State::Normal).font_offset);
 
-    // On Android, this requires the 'record audio' permissions,
-    // which is always a scary thing for users.
+    // On mobile, this requires record-audio permissions, which is always a
+    // scary thing for users.
     // Since there is no way to access it (yet) via a touchscreen, compile out.
-#if !defined(ANDROID)
+#if !defined(EE_MOBILE)
     // Set up voice chat and key bindings.
     if (PreferencesManager::get("voice_chat_enabled", "0") == "1")
     {

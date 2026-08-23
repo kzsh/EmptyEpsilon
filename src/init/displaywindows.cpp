@@ -1,5 +1,6 @@
 #include "displaywindows.h"
 #include "main.h"
+#include "platform.h"
 #include "menus/luaConsole.h"
 #include <preferenceManager.h>
 #include "windowManager.h"
@@ -36,7 +37,7 @@ bool createDisplayWindows()
             fsaa = 2;
     }
 
-#ifndef ANDROID
+#if !defined(EE_MOBILE)
     if (PreferencesManager::get("touchscreen").toInt() == 0)
     {
         engine->registerObject("mouseRenderer", new MouseRenderer(mouseLayer));

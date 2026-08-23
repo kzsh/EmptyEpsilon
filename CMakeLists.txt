@@ -582,6 +582,7 @@ set(MAIN_SOURCES
     src/missileWeaponData.h
     src/packResourceProvider.h
     src/particleEffect.h
+    src/platform.h
     src/crewPosition.h
     src/playerInfo.h
     src/preferenceManager.h
