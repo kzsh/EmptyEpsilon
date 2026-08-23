@@ -1,6 +1,10 @@
 #include "gui2_canvas.h"
 #include "gui2_element.h"
 #include "theme.h"
+#include "platform.h"
+#if defined(EE_IOS)
+#include <SDL.h>
+#endif
 #ifdef DEBUG
 #include "engine.h"
 #include "gui/mouseRenderer.h"
@@ -18,10 +22,36 @@ GuiCanvas::~GuiCanvas()
 {
 }
 
+#if defined(EE_IOS)
+//Tell iOS which part of the view holds the focused text entry, so it can scroll
+//it clear of the system keyboard instead of covering it.
+static void updateTextInputRect(const sp::Rect& element_rect, glm::vec2 virtual_size)
+{
+    static SDL_Rect previous{};
+
+    int w = 0, h = 0;
+    SDL_GetWindowSize(SDL_GL_GetCurrentWindow(), &w, &h);
+    SDL_Rect rect{
+        int(element_rect.position.x * w / virtual_size.x),
+        int(element_rect.position.y * h / virtual_size.y),
+        int(element_rect.size.x * w / virtual_size.x),
+        int(element_rect.size.y * h / virtual_size.y)};
+    if (rect.x == previous.x && rect.y == previous.y && rect.w == previous.w && rect.h == previous.h)
+        return;
+    previous = rect;
+    SDL_SetTextInputRect(&rect);
+}
+#endif
+
 void GuiCanvas::render(sp::RenderTarget& renderer)
 {
     auto window_size = renderer.getVirtualSize();
     sp::Rect window_rect(0, 0, window_size.x, window_size.y);
+
+#if defined(EE_IOS)
+    if (focus_element && SDL_IsTextInputActive())
+        updateTextInputRect(focus_element->getRect(), window_size);
+#endif
 
     runUpdates(this);
     updateLayout(window_rect);
