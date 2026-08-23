@@ -3,6 +3,7 @@
 #include "main.h"
 #include "gameGlobalInfo.h"
 #include "preferenceManager.h"
+#include "platform.h"
 #include "playerInfo.h"
 #include "multiplayer_client.h"
 #include "soundManager.h"
@@ -273,8 +274,10 @@ void CrewStationScreen::finishCreation()
     new GuiNoiseOverlay(main_panel);
     new GuiShipDestroyedPopup(this);
 
+#if !defined(EE_MOBILE) //Without hotkeys, the switcher is the only way to change station.
     if (tabs.size() < 2)
         select_station_button->hide();
+#endif
 
     keyboard_help->moveToFront();
 }
