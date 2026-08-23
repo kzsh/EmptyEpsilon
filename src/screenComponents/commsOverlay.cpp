@@ -14,6 +14,7 @@
 #include "engine.h"
 
 #include "onScreenKeyboard.h"
+#include "platform.h"
 
 GuiCommsOverlay::GuiCommsOverlay(GuiContainer* owner)
 : GuiElement(owner, "COMMS_OVERLAY"),
@@ -118,6 +119,7 @@ GuiCommsOverlay::GuiCommsOverlay(GuiContainer* owner)
     });
     chat_comms_close_button->setTextSize(20)->setPosition(-10, 0, sp::Alignment::TopRight)->setSize(70, 30);
 
+#if !defined(EE_IOS) //iOS raises the system keyboard whenever a text entry takes focus.
     if (!engine->getObject("mouseRenderer")) //If we are a touch screen, add a on screen keyboard.
     {
         OnScreenKeyboardControl* keyboard = new OnScreenKeyboardControl(chat_comms_box, chat_comms_message_entry);
@@ -126,6 +128,7 @@ GuiCommsOverlay::GuiCommsOverlay(GuiContainer* owner)
         chat_comms_send_button->setPosition(-20, -220, sp::Alignment::BottomRight);
         chat_comms_text->setSize(chat_comms_text->getSize().x, chat_comms_text->getSize().y - 200);
     }
+#endif
 
     // Panel for scripted comms with objects.
     script_comms_box = new GuiPanel(this, "COMMS_SCRIPT_BOX");
