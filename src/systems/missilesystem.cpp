@@ -154,7 +154,7 @@ void MissileSystem::renderOnRadar(sp::RenderTarget& renderer, sp::ecs::Entity e,
 {
     auto physics = e.getComponent<sp::Physics>();
     if (!physics) return;
-    auto r = physics->getSize().x;
+    auto r = physics->getRadius();
     renderer.drawCircleOutline(screen_position, r * scale, 3.0, component.triggered ? glm::u8vec4(255, 0, 0, 128) : glm::u8vec4(255, 255, 255, 128));
 }
 

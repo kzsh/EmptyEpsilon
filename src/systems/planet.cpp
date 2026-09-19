@@ -144,7 +144,7 @@ void PlanetRenderSystem::renderOnRadar(sp::RenderTarget& renderer, sp::ecs::Enti
     auto physics = e.getComponent<sp::Physics>();
     if (physics)
     {
-        renderer.fillCircle(screen_position, physics->getSize().x * scale, glm::u8vec4(component.atmosphere_color * 255.f, 128));
+        renderer.fillCircle(screen_position, physics->getRadius() * scale, glm::u8vec4(component.atmosphere_color * 255.f, 128));
     }
 }
 
