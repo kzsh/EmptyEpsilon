@@ -30,7 +30,7 @@ void DamageSystem::damageArea(glm::vec2 position, float blast_range, float min_d
         auto physics = entity.getComponent<sp::Physics>();
         if (!physics) continue;
 
-        float dist = glm::length(position - transform->getPosition()) - physics->getSize().x - min_range;
+        float dist = glm::length(position - transform->getPosition()) - physics->getRadius() - min_range;
         if (dist < 0) dist = 0;
         if (dist < blast_range - min_range)
         {
@@ -186,7 +186,7 @@ void DamageSystem::destroyedByDamage(sp::ecs::Entity entity, const DamageInfo& i
         if (auto physics = entity.getComponent<sp::Physics>()) {
             auto e = sp::ecs::Entity::create();
             auto& ee = e.addComponent<ExplosionEffect>();
-            ee.size = physics->getSize().x * 1.5f;
+            ee.size = physics->getRadius() * 1.5f;
             ee.radar = true;
             e.addComponent<sp::Transform>(*transform);
             e.addComponent<RawRadarSignatureInfo>(0.0f, 0.4f, 0.4f);

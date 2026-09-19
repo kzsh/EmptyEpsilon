@@ -881,7 +881,7 @@ void GameMasterScreen::onMouseUp(glm::vec2 position)
                         float screen_radius = 0.0f;
 
                         if (auto physics = entity.getComponent<sp::Physics>())
-                            screen_radius = physics->getSize().x * main_radar->getScale();
+                            screen_radius = physics->getRadius() * main_radar->getScale();
 
                         const float score = std::max(0.0f, screen_dist - screen_radius);
                         if (score < closest_score)

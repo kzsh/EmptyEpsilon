@@ -68,7 +68,7 @@ void GuiViewportMainScreen::onDraw(sp::RenderTarget& renderer)
             float radius = 300.0f;
             auto physics = my_spaceship.getComponent<sp::Physics>();
             if (physics)
-                radius = physics->getSize().x;
+                radius = physics->getRadius();
             camera_ship_distance = -radius;
             camera_ship_height = radius / 10.f;
             camera_pitch = 0;

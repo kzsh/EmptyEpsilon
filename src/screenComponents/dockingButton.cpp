@@ -186,7 +186,7 @@ std::vector<sp::ecs::Entity> GuiDockingButton::findDockingTargets()
         if (entity == my_spaceship) continue;
         if (Faction::getRelation(my_spaceship, entity) == FactionRelation::Enemy) continue;
         if (port->canDockOn(bay) == DockingStyle::None) continue;
-        if (glm::length(transform.getPosition() - my_transform->getPosition()) > 1000.0f + std::max(physics.getSize().x, physics.getSize().y)) continue;
+        if (glm::length(transform.getPosition() - my_transform->getPosition()) > 1000.0f + physics.getRadius()) continue;
         targets.push_back(entity);
     }
 

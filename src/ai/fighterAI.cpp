@@ -58,7 +58,7 @@ void FighterAI::runAttack(sp::ecs::Entity target)
     switch(attack_state)
     {
     case State::Dive:
-        if (distance < 2500 + (target_physics ? target_physics->getSize().x : 0.0f) && has_missiles)
+        if (distance < 2500 + (target_physics ? target_physics->getRadius() : 0.0f) && has_missiles)
         {
             auto tubes = owner.getComponent<MissileTubes>();
             for(auto& tube : tubes->mounts)
@@ -77,7 +77,7 @@ void FighterAI::runAttack(sp::ecs::Entity target)
 
         flyTowards(tt->getPosition(), 500.0);
 
-        if (distance < 500 + (target_physics ? target_physics->getSize().x : 0.0f))
+        if (distance < 500 + (target_physics ? target_physics->getRadius() : 0.0f))
         {
             aggression += random(0, 0.05);
 

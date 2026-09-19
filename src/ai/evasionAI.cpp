@@ -60,7 +60,7 @@ void EvasionAI::runOrders()
                 auto diff = transform->getPosition() - ot->getPosition();
                 float dist = glm::length(diff);
                 auto physics = ai->order_target.getComponent<sp::Physics>();
-                if (dist < 3000 + (physics ? physics->getSize().x : 0.0f))
+                if (dist < 3000 + (physics ? physics->getRadius() : 0.0f))
                 {
                     // if close to the docking target: make a run for it
                     return ShipAI::runOrders();
@@ -185,9 +185,9 @@ float EvasionAI::evasionDangerScore(sp::ecs::Entity ship, float scan_radius)
     auto position_difference = st->getPosition() - ot->getPosition();
     float distance = glm::length(position_difference);
     auto physics = owner.getComponent<sp::Physics>();
-    if (physics) enemy_max_beam_range += physics->getSize().x;
+    if (physics) enemy_max_beam_range += physics->getRadius();
     physics = ship.getComponent<sp::Physics>();
-    if (physics) enemy_max_beam_range += physics->getSize().x;
+    if (physics) enemy_max_beam_range += physics->getRadius();
 
     float danger = 0.0;
     if (enemy_missile_strength > 0.0f)

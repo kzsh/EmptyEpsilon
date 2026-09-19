@@ -55,7 +55,7 @@ void RawScannerDataRadarOverlay::onDraw(sp::RenderTarget& renderer)
 
         auto physics = entity.getComponent<sp::Physics>();
         // If we're adjacent to the object ...
-        if (physics && dist <= physics->getSize().x)
+        if (physics && dist <= physics->getRadius())
         {
             // ... affect all angles of the radar.
             a_0 = 0.0f;
@@ -63,7 +63,7 @@ void RawScannerDataRadarOverlay::onDraw(sp::RenderTarget& renderer)
         }else{
             // Otherwise, measure the affected range of angles by the object's
             // distance and radius.
-            float a_diff = glm::degrees(asinf((physics ? physics->getSize().x : 300.0f) / dist));
+            float a_diff = glm::degrees(asinf((physics ? physics->getRadius() : 300.0f) / dist));
             float a_center = vec2ToAngle(transform.getPosition() - view_position);
             a_0 = a_center - a_diff;
             a_1 = a_center + a_diff;

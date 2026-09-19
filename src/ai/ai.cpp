@@ -394,7 +394,7 @@ void ShipAI::runOrders()
     auto radius = 0.0f;
 
     if (auto physics = owner.getComponent<sp::Physics>())
-        radius = physics->getSize().x;
+        radius = physics->getRadius();
 
     //When we are not attacking a target, follow orders
     switch(ai->orders)
@@ -559,7 +559,7 @@ void ShipAI::runOrders()
                     float dist = glm::length(diff);
                     auto target_radius = 0.0f;
                     if (auto physics = ai->order_target.getComponent<sp::Physics>())
-                        target_radius = physics->getSize().x;
+                        target_radius = physics->getRadius();
                     if (dist < 600 + target_radius)
                     {
                         DockingSystem::requestDock(owner, ai->order_target);
@@ -681,7 +681,7 @@ void ShipAI::runAttack(sp::ecs::Entity target)
                 angle -= 160;
             auto target_radius = 0.0f;
             if (auto physics = target.getComponent<sp::Physics>())
-                target_radius = physics->getSize().x;
+                target_radius = physics->getRadius();
             target_position += vec2FromAngle(angle) * (attack_distance + target_radius);
             flyTowards(target_position, 0);
         }else{
@@ -700,7 +700,7 @@ void ShipAI::flyTowards(glm::vec2 target, float keep_distance)
         return;
     }
     auto my_radius = 300.0f;
-    if (auto physics = owner.getComponent<sp::Physics>()) my_radius = physics->getSize().x;
+    if (auto physics = owner.getComponent<sp::Physics>()) my_radius = physics->getRadius();
     pathPlanner.plan(my_radius, ot->getPosition(), target);
 
     if (pathPlanner.route.size() > 0)
@@ -777,7 +777,7 @@ void ShipAI::flyFormation(sp::ecs::Entity target, glm::vec2 offset)
     if (!tt) return;
     auto target_position = tt->getPosition() + rotateVec2(ai->order_target_location, tt->getRotation());
     auto my_radius = 300.0f;
-    if (auto physics = owner.getComponent<sp::Physics>()) my_radius = physics->getSize().x;
+    if (auto physics = owner.getComponent<sp::Physics>()) my_radius = physics->getRadius();
     pathPlanner.plan(my_radius, ot->getPosition(), target_position);
 
     auto impulse = owner.getComponent<ImpulseEngine>();
@@ -798,7 +798,7 @@ void ShipAI::flyFormation(sp::ecs::Entity target, glm::vec2 offset)
         //Formation flying code
         float r = 100.0f;
         if (auto physics = owner.getComponent<sp::Physics>())
-            r = physics->getSize().x * 5.0f;
+            r = physics->getRadius() * 5.0f;
         auto target_rotation = vec2ToAngle(diff);
         if (distance > r * 3)
         {
@@ -968,7 +968,7 @@ float ShipAI::calculateFiringSolution(sp::ecs::Entity target, const MissileTubes
         //If our "error" of hitting is less then double the radius of the target, fire.
         auto target_radius = 100.0f;
         if (auto physics = target.getComponent<sp::Physics>())
-            target_radius = physics->getSize().x;
+            target_radius = physics->getRadius();
         if (std::abs(angle_diff) < 80.0f && target_distance * tanf(glm::radians(fabs(angle_diff))) < target_radius * 2.0f)
             return fire_angle;
 
@@ -989,7 +989,7 @@ float ShipAI::calculateFiringSolution(sp::ecs::Entity target, const MissileTubes
             {
                 auto physics = entity.getComponent<sp::Physics>();
                 auto et = entity.getComponent<sp::Transform>();
-                if (physics && et && glm::length(et->getPosition() - ot->getPosition()) < safety_radius - physics->getSize().x)
+                if (physics && et && glm::length(et->getPosition() - ot->getPosition()) < safety_radius - physics->getRadius())
                 {
                     return std::numeric_limits<float>::infinity();
                 }

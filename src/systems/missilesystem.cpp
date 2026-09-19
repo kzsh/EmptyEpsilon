@@ -422,7 +422,7 @@ float MissileSystem::calculateFiringSolution(sp::ecs::Entity source, const Missi
         target_velocity = rotateVec2(target_physics->getVelocity(), -tube_angle);
 
     const int MAX_ITER = 10;
-    const float tolerance = 0.1f * (target_physics ? target_physics->getSize().x : 300.0f);
+    const float tolerance = 0.1f * (target_physics ? target_physics->getRadius() : 300.0f);
     bool converged = false;
     glm::vec2 aim_position = target_position; // Set initial aim point
     float turn_direction; // Left: -1, Right: +1, No turn: 0

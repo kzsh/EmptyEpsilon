@@ -64,7 +64,7 @@ void ShieldSystem::render3D(sp::ecs::Entity e, sp::Transform& transform, Shields
     if (shields.entries.empty()) return;
     auto physics = e.getComponent<sp::Physics>();
     if (!physics) return;
-    auto radius = physics->getSize().x;
+    auto radius = physics->getRadius();
 
     auto position = transform.getPosition();
     auto rotation = transform.getRotation();
@@ -113,7 +113,7 @@ void ShieldSystem::renderOnRadar(sp::RenderTarget& renderer, sp::ecs::Entity e, 
         sprite_scale = size;
     }
     else if (auto physics = e.getComponent<sp::Physics>()) {
-        sprite_scale = scale * physics->getSize().x * 2.0f;
+        sprite_scale = scale * physics->getRadius() * 2.0f;
     }
 
     if (shields.entries.size() == 1)

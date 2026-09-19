@@ -281,7 +281,7 @@ void CinematicViewScreen::update(float delta)
         auto physics = target.getComponent<sp::Physics>();
         auto radius = 300.0f;
         if (physics)
-            radius = physics->getSize().x;
+            radius = physics->getRadius();
         max_camera_distance = 1000.0f + radius + glm::length(physics->getVelocity());
         min_camera_distance = radius * 2.0f;
 

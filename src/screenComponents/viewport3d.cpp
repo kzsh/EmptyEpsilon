@@ -353,7 +353,7 @@ void GuiViewport3D::onDraw(sp::RenderTarget& renderer)
         glUniformMatrix4fv(billboard.get().uniform(ShaderRegistry::Uniforms::Model), 1, GL_FALSE, glm::value_ptr(model_matrix));
         float radius = 300.0f;
         if (auto physics = target_comp->entity.getComponent<sp::Physics>())
-            radius = physics->getSize().x;
+            radius = physics->getRadius();
         glUniform4f(billboard.get().uniform(ShaderRegistry::Uniforms::Color), .5f, .5f, .5f, radius * 2.5f);
         {
             gl::ScopedVertexAttribArray positions(billboard.get().attribute(ShaderRegistry::Attributes::Position));
@@ -435,7 +435,7 @@ void GuiViewport3D::onDraw(sp::RenderTarget& renderer)
                 continue;
             float radius = 300.0f;
             if (auto physics = entity.getComponent<sp::Physics>())
-                radius = physics->getSize().x;
+                radius = physics->getRadius();
             glm::vec3 screen_position = worldToScreen(renderer, glm::vec3(transform.getPosition().x, transform.getPosition().y, radius));
             if (screen_position.z < 0.0f)
                 continue;

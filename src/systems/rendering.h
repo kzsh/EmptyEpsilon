@@ -44,7 +44,7 @@ private:
             float depth = glm::dot(view_vector, transform.getPosition() - glm::vec2(camera_position.x, camera_position.y));
             float radius = 5000.0f;
             if (auto physics = entity.template getComponent<sp::Physics>())
-                radius = physics->getSize().x;
+                radius = physics->getRadius();
             if (depth + radius < depth_cutoff_back)
                 continue;
             if (depth - radius > depth_cutoff_front)

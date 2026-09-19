@@ -201,7 +201,7 @@ void DockingSystem::requestDock(sp::ecs::Entity entity, sp::ecs::Entity target)
     auto target_physics = target.getComponent<sp::Physics>();
     if (!target_physics) return;
 
-    if (glm::length(position->getPosition() - target_position->getPosition()) > 1000.0f + target_physics->getSize().x)
+    if (glm::length(position->getPosition() - target_position->getPosition()) > 1000.0f + target_physics->getRadius())
         return;
 
     docking_port->state = DockingPort::State::Docking;
