@@ -102,10 +102,13 @@ void BeamWeaponSystem::update(float delta)
                             mount.cooldown = mount.cycle_time; // Reset time of weapon
 
                             auto hit_location = target_transform->getPosition();
-                            auto r = 100.0f;
+                            auto edge_r = 100.0f;
+                            auto shield_r = 100.0f;
                             if (auto physics = target->entity.getComponent<sp::Physics>()) {
-                                hit_location -= glm::normalize(target_transform->getPosition() - transform.getPosition()) * physics->getRadius();
-                                r = physics->getRadius();
+                                auto dir = glm::normalize(target_transform->getPosition() - transform.getPosition());
+                                edge_r = physics->getEdgeDistance(dir, target_transform->getRotation());
+                                shield_r = physics->getRadius();
+                                hit_location -= dir * edge_r;
                             }
 
                             auto e = sp::ecs::Entity::create();
@@ -123,14 +126,37 @@ void BeamWeaponSystem::update(float delta)
                             sfx.volume = 50.0f + (beam_fire_sound_power * 75.0f);
                             sfx.pitch = (1.0f / beam_fire_sound_power) + random(-0.1f, 0.1f);
                             {
-                                auto local_hit_location = hit_location - target_transform->getPosition();
-                                be.target_offset = glm::vec3(local_hit_location.x + random(-r/2.0f, r/2.0f), local_hit_location.y + random(-r/2.0f, r/2.0f), random(-r/4.0f, r/4.0f));
+                                // Show hit on shield bubble only if shields can absorb the damage.
+                                // Otherwise show hit on the hull surface.
+                                bool shield_hit = false;
+                                if (auto shield = target->entity.getComponent<Shields>(); shield && shield->active && !shield->entries.empty())
+                                {
+                                    float angle = angleDifference(target_transform->getRotation(), vec2ToAngle(hit_location - target_transform->getPosition()));
+                                    if (angle < 0) angle += 360.0f;
+                                    float arc = 360.0f / float(shield->entries.size());
+                                    int idx = int((angle + arc / 2.0f) / arc) % shield->entries.size();
+                                    shield_hit = shield->entries[idx].level >= mount.damage;
+                                }
 
-                                auto shield = target->entity.getComponent<Shields>();
-                                if (shield && shield->active)
-                                    be.target_offset = glm::normalize(be.target_offset) * r;
+                                if (shield_hit)
+                                {
+                                    auto local_hit_location = hit_location - target_transform->getPosition();
+                                    be.target_offset = glm::vec3(local_hit_location.x + random(-edge_r/2.0f, edge_r/2.0f), local_hit_location.y + random(-edge_r/2.0f, edge_r/2.0f), random(-edge_r/4.0f, edge_r/4.0f));
+                                    be.target_offset = glm::normalize(be.target_offset) * shield_r;
+                                }
                                 else
-                                    be.target_offset = glm::normalize(be.target_offset) * random(0, r / 2.0f);
+                                {
+                                    // Perturb the hit angle and project onto the collision surface
+                                    // so scatter stays on the hull rather than clipping inside.
+                                    auto dir = glm::normalize(target_transform->getPosition() - transform.getPosition());
+                                    float hit_angle = vec2ToAngle(dir);
+                                    float perturbed_angle = hit_angle + random(-15.0f, 15.0f);
+                                    auto perturbed_dir = vec2FromAngle(perturbed_angle);
+                                    float surface_r = edge_r;
+                                    if (auto physics = target->entity.getComponent<sp::Physics>())
+                                        surface_r = physics->getEdgeDistance(perturbed_dir, target_transform->getRotation());
+                                    be.target_offset = glm::vec3(-perturbed_dir.x * surface_r, -perturbed_dir.y * surface_r, random(-edge_r/4.0f, edge_r/4.0f));
+                                }
                                 be.hit_normal = glm::normalize(be.target_offset);
                             }
 
