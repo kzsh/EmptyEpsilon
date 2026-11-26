@@ -214,6 +214,8 @@ void GuiRotatingModelView::onDraw(sp::RenderTarget& renderer)
     }
 #endif
 
+    drawOverlay(view_matrix, mesh_radius);
+
 #if 0
     {
         ShaderRegistry::ScopedShader color_shader(ShaderRegistry::Shaders::BasicColor);

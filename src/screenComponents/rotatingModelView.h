@@ -3,6 +3,8 @@
 #include "gui/gui2_element.h"
 #include "components/rendering.h"
 
+#include <glm/mat4x4.hpp>
+
 class GuiRotatingModelView : public GuiElement
 {
 private:
@@ -31,6 +33,12 @@ private:
     float debug_light_azimuth = 45.f;
     float debug_light_elevation = 45.f;
 #endif
+
+protected:
+    // Called after the model is drawn, with the view's projection and view
+    // matrices still bound. Coordinates are entity space: the space mount
+    // positions use once multiplied by the ModelData scale.
+    virtual void drawOverlay(const glm::mat4& view_matrix, float mesh_radius) {}
 
 public:
     GuiRotatingModelView(GuiContainer* owner, string id, sp::ecs::Entity& entity);

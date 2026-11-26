@@ -12,6 +12,7 @@
 #include "menus/serverBrowseMenu.h"
 #include "screens/gm/gameMasterScreen.h"
 #include "screens/extra/databaseScreen.h"
+#include "screens/extra/modelEditorScreen.h"
 #include "screenComponents/rotatingModelView.h"
 #include "config.h"
 
@@ -121,6 +122,16 @@ MainMenu::MainMenu()
             new DatabaseScreen(this);
         }
     }))->setPosition({370, -210}, sp::Alignment::BottomLeft)->setSize(300, 50);
+
+    (new GuiButton(this, "", "Model editor", [this]() {
+        new EpsilonServer(defaultServerPort);
+        if (game_server)
+        {
+            gameGlobalInfo->startScenario("scenario_10_empty.lua");
+            my_player_info->commandSetShip({});
+            new ModelEditorScreen(this);
+        }
+    }))->setPosition({370, -270}, sp::Alignment::BottomLeft)->setSize(300, 50);
 
     (new GuiButton(this, "", "TO DA GM!", [this]() {
         new EpsilonServer(defaultServerPort);
