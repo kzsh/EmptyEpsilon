@@ -20,6 +20,7 @@
 #include <cstdlib>
 
 #include <glm/ext/matrix_transform.hpp>
+#include <glm/geometric.hpp>
 #include <glm/gtc/type_ptr.hpp>
 
 namespace {
@@ -196,8 +197,14 @@ protected:
     {
         if (!model) return;
 
-        // Markers draw through the hull so mounts on the far side stay visible.
+        // Markers draw through the hull so mounts on the far side stay visible,
+        // and unculled: the preview turns a full 360 degrees, so arrows are seen
+        // from behind as often as from the front. Both states are saved rather
+        // than assumed, as the overlay runs inside the shared model view's draw.
+        const GLboolean depth_enabled = glIsEnabled(GL_DEPTH_TEST);
+        const GLboolean cull_enabled = glIsEnabled(GL_CULL_FACE);
         glDisable(GL_DEPTH_TEST);
+        glDisable(GL_CULL_FACE);
 
         ShaderRegistry::ScopedShader shader(ShaderRegistry::Shaders::BasicColor);
         const auto identity = glm::identity<glm::mat4>();
@@ -228,9 +235,61 @@ protected:
             glDrawArrays(GL_TRIANGLE_FAN, 0, segments);
         };
 
+        // Arrow geometry uses the markers' coordinate space. The axis is a
+        // convention, not data: see emissionAxis().
+        auto drawArrow = [&](glm::vec3 point, glm::vec3 axis, float radius, glm::vec4 color)
+        {
+            const glm::vec3 dir = glm::normalize(axis);
+            // u spans the ring plane with dir. The reference axis must not be
+            // parallel to dir or the cross product degenerates to zero.
+            const glm::vec3 ref = std::abs(dir.x) < 0.9f ? glm::vec3{1.0f, 0.0f, 0.0f} : glm::vec3{0.0f, 1.0f, 0.0f};
+            const glm::vec3 u = glm::normalize(glm::cross(dir, ref));
+            const glm::vec3 v = glm::cross(dir, u);
+            const glm::vec3 base = point * model->scale;
+            const float length = marker_radius * 5.0f;
+            const glm::vec3 neck = base + dir * (length * 0.7f);
+            const float head_radius = radius * 2.5f;
+            constexpr int segments = 10;
+
+            glUniform4fv(shader.get().uniform(ShaderRegistry::Uniforms::Color), 1, glm::value_ptr(color));
+
+            {
+                // Shaft: two rings, wound around the axis.
+                glm::vec3 vertices[(segments + 1) * 2];
+                int count = 0;
+                for (int n = 0; n <= segments; n++)
+                {
+                    const float angle = float(n) / segments * glm::two_pi<float>();
+                    const glm::vec3 ring = (u * glm::cos(angle) + v * glm::sin(angle)) * radius;
+                    vertices[count++] = base + ring;
+                    vertices[count++] = neck + ring;
+                }
+                glVertexAttribPointer(positions.get(), 3, GL_FLOAT, GL_FALSE, 0, vertices);
+                glDrawArrays(GL_TRIANGLE_STRIP, 0, count);
+            }
+            {
+                // Head: fan from the apex back to a wider ring at the neck.
+                // The rim vertex is repeated to close the fan.
+                glm::vec3 vertices[segments + 2];
+                vertices[0] = base + dir * length;
+                for (int n = 0; n <= segments; n++)
+                {
+                    const float angle = float(n) / segments * glm::two_pi<float>();
+                    vertices[n + 1] = neck + (u * glm::cos(angle) + v * glm::sin(angle)) * head_radius;
+                }
+                glVertexAttribPointer(positions.get(), 3, GL_FLOAT, GL_FALSE, 0, vertices);
+                glDrawArrays(GL_TRIANGLE_FAN, 0, segments + 2);
+            }
+        };
+
+        auto arrowRadius = marker_radius * 0.35f;
         for (auto category : {MountCategory::Beam, MountCategory::Tube, MountCategory::Engine})
             for (const auto& point : model->mounts(category))
+            {
                 drawMarker(point, marker_radius, categoryColor(category));
+                if (const auto axis = emissionAxis(category); glm::length2(axis) > 0.0f)
+                    drawArrow(point, axis, arrowRadius, categoryColor(category));
+            }
 
         // Selected mount last, so it sits on top: a white disc with the
         // category-colored marker over it reads as a ring.
@@ -240,12 +299,38 @@ protected:
             const auto point = selected_points[selection.index];
             drawMarker(point, marker_radius * 1.2f, {1.0f, 1.0f, 1.0f, 1.0f});
             drawMarker(point, marker_radius, categoryColor(selection.category));
+            if (const auto axis = emissionAxis(selection.category); glm::length2(axis) > 0.0f)
+                drawArrow(point, axis, arrowRadius, categoryColor(selection.category));
         }
 
-        glEnable(GL_DEPTH_TEST);
+        if (depth_enabled)
+            glEnable(GL_DEPTH_TEST);
+        if (cull_enabled)
+            glEnable(GL_CULL_FACE);
     }
 
 private:
+    // Emission direction, in model_data coordinates. There +X is the bow:
+    // mirrored port/starboard mounts share an X and differ in Y (destroyer beams
+    // at 34,-17 and 34,17), fore/aft spread is in X (same destroyer: beams at
+    // x=34 and x=-5, engine at x=-30), and Z is height.
+    // Neither axis is stored per mount. EngineEmitter has no direction and its
+    // particles spawn with start equal to end, so exhaust has no travel vector at
+    // all; aft is what every emitter's position implies. Tube direction is
+    // per-ship template data (MissileTubes::MountPoint::direction), unavailable
+    // here; its default of zero is forward. Beams are aimed by the template's
+    // arc, so no axis.
+    static glm::vec3 emissionAxis(MountCategory category)
+    {
+        switch (category)
+        {
+        case MountCategory::Beam: return {};
+        case MountCategory::Tube: return {1.0f, 0.0f, 0.0f};
+        case MountCategory::Engine: break;
+        }
+        return {-1.0f, 0.0f, 0.0f};
+    }
+
     static glm::vec4 categoryColor(MountCategory category)
     {
         switch (category)
