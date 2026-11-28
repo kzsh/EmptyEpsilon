@@ -4,6 +4,8 @@
 
 BASIC_REPLICATION_IMPL(MissileFlightReplication, MissileFlight)
     BASIC_REPLICATION_FIELD(speed);
+    // Only mines set timeout; clients use it to tell mines from other projectiles.
+    BASIC_REPLICATION_FIELD(timeout);
 }
 
 BASIC_REPLICATION_IMPL(MissileHomingReplication, MissileHoming)

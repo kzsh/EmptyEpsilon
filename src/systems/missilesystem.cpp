@@ -12,6 +12,7 @@
 #include "components/rendering.h"
 #include "components/faction.h"
 #include "components/avoidobject.h"
+#include "components/trail.h"
 #include "ecs/query.h"
 #include "multiplayer_server.h"
 #include "particleEffect.h"
@@ -334,8 +335,8 @@ void MissileSystem::spawnProjectile(sp::ecs::Entity source, MissileTubes::MountP
         auto& t = missile.addComponent<sp::Transform>();
         t.setPosition(fire_location);
         t.setRotation(source_transform->getRotation() + tube.direction);
-        auto& cpe = missile.addComponent<ConstantParticleEmitter>();
         if (tube.type_loaded == MW_Mine) {
+            auto& cpe = missile.addComponent<ConstantParticleEmitter>();
             cpe.travel_random_range = 100.0f;
             cpe.start_color = {1, 1, 1};
             cpe.end_color = {0, 0, 1};
@@ -345,9 +346,14 @@ void MissileSystem::spawnProjectile(sp::ecs::Entity source, MissileTubes::MountP
             cpe.life_time = 10.0f;
         }
 
-        if (tube.type_loaded != MW_Mine){
+        if (tube.type_loaded != MW_Mine) {
             auto& lifetime = missile.addComponent<LifeTime>();
             lifetime.maximum = mwd.lifetime * category_modifier;
+            auto& trail = missile.addComponent<Trail>();
+            trail.detach_on_destroy = true;
+            trail.head_glow = true;
+            trail.ribbons.push_back({});
+            trail.ribbons.back().color = {mwd.color.r / 255.0f, mwd.color.g / 255.0f, mwd.color.b / 255.0f};
         }
 
         if (tube.type_loaded != MW_Mine) {

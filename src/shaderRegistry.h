@@ -38,6 +38,7 @@ namespace ShaderRegistry
 		ObjectSpecularNormal,
 		ObjectSpecularIlluminationNormal,
 		Planet,
+		Trail,
 
 		Count
 	};
@@ -73,6 +74,7 @@ namespace ShaderRegistry
 		Texcoords,
 		Normal,
 		Tangent,
+		Color,
 
 		Count
 	};

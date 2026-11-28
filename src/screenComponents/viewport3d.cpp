@@ -18,6 +18,7 @@
 #include "components/hull.h"
 #include "components/rendering.h"
 #include "components/impulse.h"
+#include "components/trail.h"
 #include "components/name.h"
 #include "components/zone.h"
 #include "systems/rendering.h"
@@ -259,14 +260,52 @@ void GuiViewport3D::onDraw(sp::RenderTarget& renderer)
     }
     glDepthMask(GL_TRUE);
 
-    // Emit engine particles.
+    // Emit engine particles. Small plumes are drawn as continuous trails
+    // instead: 10Hz spawn sampling reads as a string of dots on small,
+    // fast ships, whereas large plumes overlap into a continuous glow.
+    static constexpr float engine_trail_max_scale = 3.0f;
     for(auto [entity, ee, transform, impulse] : sp::ecs::Query<EngineEmitter, sp::Transform, ImpulseEngine>()) {
+        auto trail = entity.getComponent<Trail>();
+        if (!trail)
+        {
+            bool has_small_emitter = false;
+            for (const auto& ed : ee.emitters)
+                has_small_emitter |= ed.scale <= engine_trail_max_scale;
+            if (has_small_emitter)
+            {
+                auto& new_trail = entity.addComponent<Trail>();
+                for (const auto& ed : ee.emitters)
+                {
+                    if (ed.scale > engine_trail_max_scale)
+                        continue;
+                    Trail::Ribbon ribbon;
+                    ribbon.offset = {ed.position.x, ed.position.y};
+                    ribbon.color = ed.color;
+                    new_trail.ribbons.push_back(ribbon);
+                }
+                trail = &new_trail;
+            }
+        }
+        if (trail)
+        {
+            trail->sampling = impulse.actual != 0.0f;
+            if (impulse.actual != 0.0f)
+            {
+                size_t ribbon_i = 0;
+                for (const auto& ed : ee.emitters)
+                    if (ed.scale <= engine_trail_max_scale)
+                        trail->ribbons[ribbon_i++].head_width = ed.scale * std::abs(impulse.actual);
+            }
+        }
+
         if (impulse.actual != 0.0f) {
             float engine_scale = std::abs(impulse.actual);
             if (engine->getElapsedTime() - ee.last_engine_particle_time > 0.1f)
             {
                 for(auto ed : ee.emitters)
                 {
+                    if (ed.scale <= engine_trail_max_scale)
+                        continue;
                     glm::vec3 offset = ed.position;
                     glm::vec2 pos2d = transform.getPosition() + rotateVec2(glm::vec2(offset.x, offset.y), transform.getRotation());
                     glm::vec3 color = ed.color;

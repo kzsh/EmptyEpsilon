@@ -376,6 +376,7 @@ set(MAIN_SOURCES
     src/components/zone.cpp
     src/components/moveto.h
     src/components/lifetime.h
+    src/components/trail.h
     src/components/destroy.h
     src/systems/ai.h
     src/systems/ai.cpp
@@ -441,6 +442,8 @@ set(MAIN_SOURCES
     src/systems/debugrender.cpp
     src/systems/destroy.h
     src/systems/destroy.cpp
+    src/systems/trailsystem.h
+    src/systems/trailsystem.cpp
     src/multiplayer/beamweapon.h
     src/multiplayer/beamweapon.cpp
     src/multiplayer/shields.h

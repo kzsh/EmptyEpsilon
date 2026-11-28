@@ -34,7 +34,8 @@ namespace ShaderRegistry
             "shaders/objectShader:ILLUMINATION:NORMAL",
             "shaders/objectShader:SPECULAR:NORMAL",
             "shaders/objectShader:ILLUMINATION:SPECULAR:NORMAL",
-            "shaders/planet"
+            "shaders/planet",
+            "shaders/trail"
         };
 
         std::array<const char*, Uniforms_t(Uniforms::Count)> uniform_names{
@@ -60,6 +61,7 @@ namespace ShaderRegistry
             "a_texcoords",
             "a_normal",
             "a_tangent",
+            "a_color",
         };
 
         std::array<std::tuple<Uniforms, int32_t>, 5> texture_units{
